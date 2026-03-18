@@ -1,0 +1,38 @@
+id: exposed-git
+
+info:
+  name: Exposed .git Directory
+  author: guardx
+  severity: critical
+  description: |
+    Detects exposed .git directory which may contain sensitive source code,
+    commit history, branches, and potentially exposed secrets in git logs.
+  reference:
+    - https://owasp.org/www-community/Sensitive_Data_Exposure
+    - https://github.com/internetwache/GitTools
+  tags:
+    - exposure
+    - git
+    - source-code
+
+http:
+  - method: GET
+    path:
+      - "/.git/"
+      - "/.git/config"
+      - "/.git/HEAD"
+      - "/.gitignore"
+
+    matchers:
+      - type: status
+        status:
+          - 200
+
+    extractors:
+      - type: regex
+        part: body
+        group: 1
+        regex:
+          - "\\[core\\]"
+          - "repositoryformatversion"
+          - "ref: refs"

@@ -1,0 +1,16 @@
+services:
+  guardx:
+    build: .
+    container_name: guardx-ai
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      - GUARDX_PORT=5000
+    volumes:
+      - guardx-data:/home/guardx/.guardx
+    restart: unless-stopped
+
+volumes:
+  guardx-data:

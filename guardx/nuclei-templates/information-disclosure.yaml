@@ -1,0 +1,63 @@
+id: information-disclosure
+
+info:
+  name: Information Disclosure - Server Version Leakage
+  author: guardx
+  severity: medium
+  description: |
+    Detects information disclosure vulnerabilities where server
+    and application version information is exposed through headers,
+    error messages, or page content, allowing attackers to identify
+    specific versions for targeted exploitation.
+  reference:
+    - https://owasp.org/www-community/Sensitive_Data_Exposure
+  tags:
+    - disclosure
+    - information
+    - enumeration
+
+http:
+  - method: GET
+    path:
+      - "/"
+
+    matchers:
+      - type: regex
+        part: header
+        regex:
+          - "(?i)^Server:\\s*(.+)$"
+          - "(?i)^X-Powered-By:\\s*(.+)$"
+          - "(?i)^X-AspNet-Version:\\s*(.+)$"
+
+    extractors:
+      - type: regex
+        part: header
+        group: 1
+        regex:
+          - "(?i)^Server:\\s*(.+)$"
+          - "(?i)^X-Powered-By:\\s*(.+)$"
+          - "(?i)^X-AspNet-Version:\\s*(.+)$"
+
+  - method: GET
+    path:
+      - "/"
+
+    matchers:
+      - type: word
+        words:
+          - "Powered by"
+          - "Version"
+          - "Built on"
+          - "Django"
+          - "WordPress"
+          - "Apache"
+          - "nginx"
+          - "Microsoft-IIS"
+        condition: or
+        part: body
+
+    extractors:
+      - type: regex
+        part: body
+        regex:
+          - "(?i)(Powered by|Version|Built on)\\s*([^<\\n]+)"

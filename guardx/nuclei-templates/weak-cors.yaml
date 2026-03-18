@@ -1,0 +1,62 @@
+id: weak-cors
+
+info:
+  name: CORS Misconfiguration - Wildcard Origin
+  author: guardx
+  severity: high
+  description: |
+    Detects CORS (Cross-Origin Resource Sharing) misconfiguration
+    where Access-Control-Allow-Origin is set to '*' or other
+    overly permissive values, allowing any domain to access resources.
+  reference:
+    - https://owasp.org/www-community/CORS_Misconfiguration
+  tags:
+    - cors
+    - misconfiguration
+    - access-control
+
+http:
+  - method: OPTIONS
+    path:
+      - "/"
+
+    headers:
+      Origin: "http://evil.com"
+
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "Access-Control-Allow-Origin: *"
+          - "Access-Control-Allow-Origin: http://evil.com"
+        condition: or
+
+    extractors:
+      - type: regex
+        part: header
+        regex:
+          - "Access-Control-Allow-Origin:\\s*([^\\r\\n]+)"
+
+  - method: OPTIONS
+    path:
+      - "/api"
+      - "/api/"
+      - "/api/v1"
+
+    headers:
+      Origin: "http://attacker.com"
+
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "Access-Control-Allow-Origin: *"
+          - "Access-Control-Allow-Credentials: true"
+        condition: or
+
+    extractors:
+      - type: regex
+        part: header
+        regex:
+          - "Access-Control-Allow-Origin:\\s*([^\\r\\n]+)"
+          - "Access-Control-Allow-Credentials:\\s*([^\\r\\n]+)"

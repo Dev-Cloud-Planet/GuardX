@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.env
+*.egg-info/
+dist/
+build/
+.venv/
+
+# Excluded from repo
+CLAUDE.md
+CORE_MODULES.md
+CORE_QUICK_REFERENCE.md
+codex-oauth-module/

@@ -1,0 +1,49 @@
+id: exposed-admin
+
+info:
+  name: Exposed Admin Panels Without Authentication
+  author: guardx
+  severity: high
+  description: |
+    Detects exposed administrative interfaces and panels that are
+    accessible without proper authentication such as:
+    admin dashboards, control panels, and management interfaces.
+  reference:
+    - https://owasp.org/www-community/Broken_Access_Control
+  tags:
+    - exposure
+    - admin
+    - auth
+
+http:
+  - method: GET
+    path:
+      - "/admin"
+      - "/admin/"
+      - "/administrator"
+      - "/admin/index.php"
+      - "/admin/login"
+      - "/admin/dashboard"
+      - "/superadmin"
+      - "/webadmin"
+      - "/adminpanel"
+      - "/admin-panel"
+      - "/control-panel"
+      - "/cpanel"
+      - "/phpmyadmin"
+      - "/mysql-admin"
+      - "/management"
+      - "/backend"
+
+    matchers:
+      - type: status
+        status:
+          - 200
+
+    matchers-condition: and
+
+    extractors:
+      - type: regex
+        part: body
+        regex:
+          - "(?i)(admin|dashboard|login|authentication)"

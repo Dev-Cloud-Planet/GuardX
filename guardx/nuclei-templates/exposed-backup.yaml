@@ -1,0 +1,50 @@
+id: exposed-backup
+
+info:
+  name: Exposed Backup Files
+  author: guardx
+  severity: high
+  description: |
+    Detects exposed backup files in common locations such as:
+    .bak, .sql, .tar.gz, .zip, .rar, and other archive formats
+    containing application data and source code.
+  reference:
+    - https://owasp.org/www-community/Sensitive_Data_Exposure
+  tags:
+    - exposure
+    - backup
+    - files
+
+http:
+  - method: GET
+    path:
+      - "/backup.tar.gz"
+      - "/backup.zip"
+      - "/backup.rar"
+      - "/backup.sql"
+      - "/database.sql"
+      - "/database.tar.gz"
+      - "/app.bak"
+      - "/config.bak"
+      - "/web.config.bak"
+      - "/index.php.bak"
+      - "/.htaccess.bak"
+      - "/wp-config.php.bak"
+      - "/application.properties.bak"
+      - "/src.tar.gz"
+      - "/source.zip"
+
+    matchers:
+      - type: status
+        status:
+          - 200
+
+    extractors:
+      - type: regex
+        part: header
+        group: 1
+        regex:
+          - "application/x-gzip"
+          - "application/zip"
+          - "application/x-rar"
+          - "application/sql"

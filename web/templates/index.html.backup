@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GuardX - AI Security Agent</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+            --bg-primary: #080b12;
+            --bg-secondary: #0d1117;
+            --bg-card: #111827;
+            --bg-input: #1a2332;
+            --border: #1e2d3d;
+            --border-active: #3b82f6;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --blue: #3b82f6;
+            --blue-dark: #1e40af;
+            --red: #ef4444;
+            --red-dark: #991b1b;
+            --green: #10b981;
+            --green-dark: #065f46;
+            --yellow: #f59e0b;
+            --yellow-dark: #78350f;
+            --purple: #8b5cf6;
+            --cyan: #06b6d4;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: 'Inter', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* ── Login Screen ──────────────────────────────── */
+        .login-screen {
+            position: fixed; inset: 0; background: var(--bg-primary);
+            display: flex; justify-content: center; align-items: center; z-index: 200;
+        }
+        .login-screen.hidden { display: none; }
+        .login-box {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px;
+            padding: 40px; width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+        .login-box .logo-icon { margin-bottom: 20px; }
+        .login-box h2 { font-size: 24px; margin-bottom: 8px; }
+        .login-box .subtitle { color: var(--text-secondary); margin-bottom: 28px; font-size: 0.9em; }
+        .login-box .form-group { margin-bottom: 16px; text-align: left; }
+        .login-box label { display: block; margin-bottom: 6px; font-size: 0.85em; color: var(--text-secondary); }
+        .login-box input { width: 100%; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text-primary); font-size: 0.9em; }
+        .login-box input:focus { outline: none; border-color: var(--border-active); }
+        .login-box #loginError { color: var(--red); font-size: 0.85em; margin-bottom: 16px; display: none; }
+        .login-box button { margin-top: 16px; }
+
+        /* ── Main Layout ──────────────────────────────────── */
+        .app { display: flex; height: 100%; }
+        .sidebar {
+            width: 280px; background: var(--bg-secondary); border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; overflow-y: auto;
+        }
+        .main-panel {
+            flex: 1; display: flex; flex-direction: column; overflow: hidden;
+        }
+        .header {
+            background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 16px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .logo { font-size: 18px; font-weight: 700; color: var(--blue); }
+        .status-dot {
+            width: 12px; height: 12px; border-radius: 50%; background: var(--text-muted);
+            transition: all 0.3s;
+        }
+        .status-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .status-dot.ws-connected { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+        .status-text { font-size: 0.85em; color: var(--text-secondary); }
+        .btn { background: var(--blue); color: var(--text-primary); border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 500; transition: all 0.2s; font-size: 0.85em; }
+        .btn:hover { background: var(--blue-dark); }
+        .btn-green { background: var(--green); }
+        .btn-green:hover { background: var(--green-dark); }
+        .btn-red { background: var(--red); }
+        .btn-red:hover { background: var(--red-dark); }
+        .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .btn.btn-active { animation: pulseBtn 1.5s infinite; box-shadow: 0 0 12px var(--blue); }
+        .btn-green.btn-active { box-shadow: 0 0 12px var(--green); }
+        @keyframes pulseBtn { 0%,100% { opacity:1; } 50% { opacity:0.7; } }
+
+        /* ── Sidebar Content ──────────────────────────────── */
+        .sidebar-header {
+            padding: 16px; border-bottom: 1px solid var(--border);
+        }
+        .sidebar-header h3 { font-size: 0.9em; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+        .scan-actions {
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .scan-actions button { font-size: 0.85em; padding: 10px 12px; }
+        .status-bar {
+            padding: 16px; border-bottom: 1px solid var(--border);
+        }
+        .status-item {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.85em;
+        }
+        .status-label { color: var(--text-secondary); }
+        .status-value { color: var(--text-primary); font-weight: 600; }
+        .badge {
+            display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; text-transform: uppercase;
+        }
+        .badge-critical { background: var(--red-dark); color: var(--red); }
+        .badge-high { background: var(--yellow-dark); color: var(--yellow); }
+        .badge-medium { background: rgba(59, 130, 246, 0.1); color: var(--blue); }
+        .badge-low { background: var(--green-dark); color: var(--green); }
+        .phase-badge {
+            display: inline-block; padding: 6px 10px; border-radius: 6px; font-size: 0.8em; font-weight: 600; text-transform: uppercase;
+        }
+        .phase-attack { background: var(--red-dark); color: var(--red); }
+        .phase-defense { background: var(--blue-dark); color: var(--blue); }
+        .phase-report { background: var(--purple); color: white; }
+
+        /* ── Progress Container ──────────────────────────── */
+        .progress-container {
+            padding: 12px 16px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+        }
+        .progress-container.hidden { display: none !important; }
+        .progress-label { font-size: 0.85em; color: var(--text-secondary); margin-bottom: 6px; }
+        .progress-bar-track {
+            width: 100%; height: 6px; background: var(--bg-input); border-radius: 3px; overflow: hidden; margin-bottom: 4px;
+        }
+        .progress-bar-fill {
+            height: 100%; background: linear-gradient(90deg, var(--blue), var(--cyan)); transition: width 0.3s;
+        }
+        .progress-pct { font-size: 0.8em; color: var(--text-muted); text-align: right; }
+
+        /* ── Tabs ────────────────────────────────────────── */
+        .tabs {
+            display: flex; border-bottom: 1px solid var(--border); gap: 4px; padding: 0 16px; background: var(--bg-card);
+        }
+        .tab-btn {
+            background: none; border: none; color: var(--text-secondary); padding: 12px 16px; cursor: pointer;
+            font-size: 0.85em; font-weight: 500; border-bottom: 2px solid transparent; transition: all 0.2s;
+        }
+        .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+        .tab-btn:hover { color: var(--text-primary); }
+
+        /* ── Tab Content ─────────────────────────────────── */
+        .tab-content { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+        .tab-content.active { display: flex; }
+        .console { flex: 1; overflow-y: auto; padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
+        .log-entry {
+            margin-bottom: 8px; padding: 8px 12px; border-radius: 4px; background: var(--bg-input);
+            border-left: 2px solid var(--border); display: flex; gap: 8px; align-items: flex-start;
+        }
+        .log-entry.phase { background: var(--bg-card); border-left-color: var(--cyan); }
+        .log-entry.finding { background: var(--bg-card); border-left-color: var(--red); }
+        .log-entry.tool { background: var(--bg-card); border-left-color: var(--purple); }
+        .log-entry.result { background: var(--bg-card); border-left-color: var(--green); }
+        .log-entry.confirm { background: var(--bg-card); border-left-color: var(--yellow); }
+        .log-entry.system { background: var(--bg-card); border-left-color: var(--text-muted); }
+        .log-tag {
+            display: inline-block; padding: 2px 6px; border-radius: 3px; font-weight: 600; white-space: nowrap; font-size: 0.8em;
+        }
+        .tag-user { background: var(--blue-dark); color: var(--blue); }
+        .tag-system { background: var(--text-muted); color: var(--bg-primary); opacity: 0.7; }
+        .tag-phase { background: var(--cyan); color: var(--bg-primary); }
+        .tag-tool { background: var(--purple); color: white; }
+        .tag-result { background: var(--green-dark); color: var(--green); }
+        .tag-finding-critical { background: var(--red); color: white; }
+        .tag-finding-high { background: var(--yellow); color: var(--bg-primary); }
+        .tag-finding-medium { background: var(--blue); color: white; }
+        .tag-finding-low { background: var(--green); color: var(--bg-primary); }
+        .log-text { flex: 1; word-break: break-word; }
+        .log-text.finding-title { font-weight: 600; color: var(--text-primary); }
+        .log-text.finding-evidence { color: var(--text-secondary); font-size: 0.85em; margin-top: 4px; }
+
+        /* ── Input Area ──────────────────────────────────── */
+        .input-area {
+            display: flex; gap: 8px; padding: 16px; border-top: 1px solid var(--border); background: var(--bg-card);
+        }
+        .input-area input {
+            flex: 1; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+            color: var(--text-primary); padding: 10px 12px; font-size: 0.85em; font-family: 'JetBrains Mono', monospace;
+        }
+        .input-area input:focus { outline: none; border-color: var(--border-active); }
+        .input-area button { padding: 10px 20px; }
+
+        /* ── History Tab ─────────────────────────────────– */
+        .history-list {
+            flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px;
+        }
+        .history-item {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .history-item:hover { border-color: var(--blue); background: rgba(59, 130, 246, 0.05); }
+        .history-item-title {
+            font-weight: 600; margin-bottom: 4px; color: var(--text-primary);
+        }
+        .history-item-meta {
+            font-size: 0.8em; color: var(--text-muted); display: flex; justify-content: space-between;
+        }
+
+        /* ── Schedule Tab ────────────────────────────────– */
+        .schedule-list {
+            flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px;
+        }
+        .schedule-item {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+        }
+        .schedule-item-title {
+            font-weight: 600; margin-bottom: 6px; color: var(--text-primary);
+        }
+        .schedule-item-meta {
+            font-size: 0.8em; color: var(--text-muted); margin-bottom: 8px;
+        }
+        .schedule-item-btns {
+            display: flex; gap: 8px; font-size: 0.8em;
+        }
+        .schedule-item-btns button { padding: 6px 10px; }
+
+        /* ── API Tab ────────────────────────────────────– */
+        .api-content {
+            flex: 1; overflow-y: auto; padding: 16px;
+        }
+        .api-endpoint {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+            margin-bottom: 12px;
+        }
+        .api-endpoint-method {
+            font-weight: 600; font-family: 'JetBrains Mono', monospace; margin-bottom: 6px;
+        }
+        .api-endpoint-desc {
+            font-size: 0.85em; color: var(--text-secondary); margin-bottom: 6px;
+        }
+
+        /* ── Confirm Bar ─────────────────────────────────– */
+        .confirm-bar {
+            background: var(--yellow-dark); border-bottom: 1px solid var(--yellow); padding: 12px 16px;
+            display: flex; align-items: center; gap: 12px; justify-content: space-between;
+            animation: slideDown 0.3s;
+        }
+        .confirm-bar.hidden { display: none; }
+        @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .confirm-text { color: var(--text-primary); font-weight: 500; }
+        .confirm-cmd { color: var(--yellow); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+        .confirm-bar-buttons { display: flex; gap: 8px; }
+
+        /* ── Modal ──────────────────────────────────────– */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex;
+            justify-content: center; align-items: center; z-index: 100;
+        }
+        .modal-overlay.hidden { display: none; }
+        .modal {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+            padding: 32px; width: 420px; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .modal h3 { margin-bottom: 8px; font-size: 1.1em; }
+        .modal p { color: var(--text-secondary); margin-bottom: 16px; font-size: 0.9em; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 6px; font-size: 0.85em; color: var(--text-secondary); }
+        .form-group input { width: 100%; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text-primary); }
+        .form-group input:focus { outline: none; border-color: var(--border-active); }
+        .modal-btns { display: flex; gap: 12px; margin-top: 20px; }
+        .modal-btns button { flex: 1; }
+
+        /* ── Scrollbar ──────────────────────────────────– */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-input); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--border-active); }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-box">
+            <div class="logo-icon" style="font-size:32px">🛡️</div>
+            <h2>GuardX</h2>
+            <p class="subtitle">AI Security Agent</p>
+            <div class="form-group">
+                <label>Usuario</label>
+                <input type="text" id="loginUser" placeholder="admin">
+            </div>
+            <div class="form-group">
+                <label>Contraseña</label>
+                <input type="password" id="loginPass" placeholder="••••••••">
+            </div>
+            <div id="loginError" style="display:none"></div>
+            <button class="btn btn-green" onclick="doLogin()" style="width:100%">ENTRAR</button>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div class="app" id="mainApp" style="display:none">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h3>GuardX</h3>
+                <div class="scan-actions">
+                    <button class="btn btn-green" onclick="startScan()" id="scanBtn">▶ Escanear</button>
+                    <button class="btn" onclick="startExploit()" id="exploitBtn" disabled>⚡ Explotar</button>
+                    <button class="btn" onclick="startReport()" id="reportBtn" disabled>📊 Reporte</button>
+                    <button class="btn" onclick="startRemediate()" id="remediateBtn" disabled>🔧 Reparar</button>
+                    <button class="btn btn-red" onclick="cancelScan()" id="cancelBtn" disabled>✕ Cancelar</button>
+                </div>
+            </div>
+            <div class="progress-container hidden" id="progressContainer">
+                <div class="progress-label" id="progressLabel">Escaneando...</div>
+                <div class="progress-bar-track">
+                    <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+                </div>
+                <div class="progress-pct" id="progressPct">0%</div>
+            </div>
+            <div class="status-bar">
+                <div class="status-item">
+                    <span class="status-label">Fase:</span>
+                    <span class="phase-badge" id="phaseDisplay">idle</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Herramientas:</span>
+                    <span class="status-value" id="toolCount">0</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Tiempo:</span>
+                    <span class="status-value" id="timerDisplay">0:00</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label" style="color:var(--red)">CRITICAL:</span>
+                    <span class="badge badge-critical" id="criticalCount">0</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label" style="color:var(--yellow)">HIGH:</span>
+                    <span class="badge badge-high" id="highCount">0</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label" style="color:var(--blue)">MEDIUM:</span>
+                    <span class="badge badge-medium" id="mediumCount">0</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label" style="color:var(--green)">LOW:</span>
+                    <span class="badge badge-low" id="lowCount">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Panel -->
+        <div class="main-panel">
+            <div class="header">
+                <div class="header-left">
+                    <div class="logo">GuardX</div>
+                    <div style="width:1px;height:24px;background:var(--border)"></div>
+                    <div class="status-dot" id="statusDot"></div>
+                    <span class="status-text" id="statusText">Desconectado</span>
+                </div>
+                <div class="header-right">
+                    <span id="userDisplay" style="font-size:0.85em;color:var(--text-secondary)"></span>
+                    <button class="btn" onclick="doLogout()" id="logoutBtn" style="display:none">Salir</button>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('scanner')">Scanner</button>
+                <button class="tab-btn" onclick="switchTab('history')">Historial</button>
+                <button class="tab-btn" onclick="switchTab('schedule')">Programados</button>
+                <button class="tab-btn" onclick="switchTab('api')">API</button>
+            </div>
+
+            <!-- Scanner Tab -->
+            <div class="tab-content active" id="scannerTab">
+                <div class="console" id="console"></div>
+                <div class="confirm-bar hidden" id="confirmBar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <span class="confirm-text">Confirmar accion:</span>
+                    <span class="confirm-cmd" id="confirmCmd"></span>
+                    <div class="confirm-bar-buttons">
+                        <button class="btn btn-green" onclick="confirmAction(true)" style="padding:8px 16px">APROBAR</button>
+                        <button class="btn" onclick="confirmAction(false)" style="padding:8px 16px;background:var(--bg-input);color:var(--text-secondary)">SALTAR</button>
+                    </div>
+                </div>
+                <div class="input-area">
+                    <input type="text" id="chatInput" placeholder="Enviar mensaje..." onkeyup="event.key==='Enter' && sendChat()">
+                    <button class="btn btn-blue" onclick="sendChat()">Enviar</button>
+                </div>
+            </div>
+
+            <!-- History Tab -->
+            <div class="tab-content" id="historyTab">
+                <div class="history-list" id="historyList">
+                    <div style="color:var(--text-muted);text-align:center;padding:32px">Cargando historial...</div>
+                </div>
+            </div>
+
+            <!-- Schedule Tab -->
+            <div class="tab-content" id="scheduleTab">
+                <div class="schedule-list" id="scheduleList">
+                    <div style="color:var(--text-muted);text-align:center;padding:32px">Cargando programados...</div>
+                </div>
+            </div>
+
+            <!-- API Tab -->
+            <div class="tab-content" id="apiTab">
+                <div class="api-content">
+                    <h3 style="margin-bottom:16px">REST API v1</h3>
+                    <div class="api-endpoint">
+                        <div style="color:var(--green)">POST /api/v1/scan</div>
+                        <div style="color:var(--text-muted);font-size:0.85em;margin-bottom:8px">Iniciar escaneo (target, phases)</div>
+                        <div style="color:var(--green)">POST /api/v1/scan/&lt;id&gt;/confirm</div>
+                        <div style="color:var(--text-muted);font-size:0.85em;margin-bottom:8px">Aprobar accion (approved: bool)</div>
+                    </div>
+                    <div class="api-endpoint">
+                        <div style="color:var(--green)">GET  /api/v1/scan/&lt;id&gt;</div>
+                        <div style="color:var(--text-muted);font-size:0.85em;margin-bottom:8px">Estado del escaneo</div>
+                        <div style="color:var(--green)">GET  /api/v1/scan/&lt;id&gt;/report</div>
+                        <div style="color:var(--text-muted);font-size:0.85em;margin-bottom:8px">Reporte HTML o JSON (segun Accept header)</div>
+                        <div style="color:var(--green)">GET  /api/v1/scans</div>
+                        <div style="color:var(--text-muted);font-size:0.85em;margin-bottom:8px">Listar todos los escaneos (?page=1&per_page=20)</div>
+                        <div style="color:var(--red)">DELETE /api/v1/scan/&lt;id&gt;</div>
+                        <div style="color:var(--text-muted);font-size:0.85em;margin-bottom:16px">Cancelar escaneo</div>
+                        <div style="border-top:1px solid var(--border);padding-top:12px;color:var(--text-secondary);font-size:0.85em">
+                            Auth: Header <span style="color:var(--yellow)">Authorization: Bearer &lt;API_KEY&gt;</span> o <span style="color:var(--yellow)">X-API-Key: &lt;KEY&gt;</span><br>
+                            Configurar en .env: <span style="color:var(--cyan)">GUARDX_API_KEYS=key1,key2</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SSH Modal -->
+    <div class="modal-overlay hidden" id="sshModal">
+        <div class="modal">
+            <h3>Conectar al servidor</h3>
+            <p>Ingresa las credenciales SSH para aplicar correcciones</p>
+            <div class="form-group">
+                <label>HOST (dejar vacio = target actual)</label>
+                <input type="text" id="sshHost" placeholder="192.168.1.1">
+            </div>
+            <div class="form-group">
+                <label>USUARIO</label>
+                <input type="text" id="sshUser" placeholder="root">
+            </div>
+            <div class="form-group">
+                <label>PASSWORD</label>
+                <input type="password" id="sshPass" placeholder="••••••••">
+            </div>
+            <div class="form-group">
+                <label>LLAVE SSH (opcional)</label>
+                <input type="text" id="sshKey" placeholder="/home/user/.ssh/id_rsa">
+            </div>
+            <div class="modal-btns">
+                <button class="btn btn-green" onclick="confirmSSHAndRemediate()">CONECTAR Y REPARAR</button>
+                <button class="btn" style="background:var(--bg-input);color:var(--text-secondary)" onclick="hideSSHModal()">CANCELAR</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ── State ────────────────────────────────────────────
+        let socket = null;
+        let scanStart = null;
+        let timerInterval = null;
+        let toolCount = 0;
+        let currentPhase = 'idle';
+        let stats = { critical: 0, high: 0, medium: 0, low: 0 };
+        let authRequired = false;
+        let scanRunning = false;
+        let currentScanId = null;
+        let currentConfirmId = null;
+
+        // ── Elements ──────────────────────────────────────────
+        const loginScreen = document.getElementById('loginScreen');
+        const mainApp = document.getElementById('mainApp');
+        const console_ = document.getElementById('console');
+        const chatInput = document.getElementById('chatInput');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const confirmBar = document.getElementById('confirmBar');
+        const confirmCmd = document.getElementById('confirmCmd');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+        const progressPct = document.getElementById('progressPct');
+        const progressLabel = document.getElementById('progressLabel');
+        const phaseDisplay = document.getElementById('phaseDisplay');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const toolCountDisplay = document.getElementById('toolCount');
+        const criticalCountDisplay = document.getElementById('criticalCount');
+        const highCountDisplay = document.getElementById('highCount');
+        const mediumCountDisplay = document.getElementById('mediumCount');
+        const lowCountDisplay = document.getElementById('lowCount');
+        const sshModal = document.getElementById('sshModal');
+
+        // ── Init: Check if auth is needed ────────────────────
+        (async function init() {
+            try {
+                const r = await fetch('/api/status');
+                if (r.status === 401) {
+                    authRequired = true;
+                    loginScreen.classList.remove('hidden');
+                    document.getElementById('logoutBtn').style.display = 'flex';
+                } else {
+                    loginScreen.classList.add('hidden');
+                    mainApp.style.display = 'flex';
+                    const data = await r.json();
+                    if (data.user) {
+                        document.getElementById('userDisplay').textContent = `Usuario: ${data.user}`;
+                    }
+                    connectWebSocket();
+                    loadHistory();
+                    loadSchedules();
+                }
+            } catch(e) {
+                // No auth needed or server not reachable
+                loginScreen.classList.add('hidden');
+                mainApp.style.display = 'flex';
+                connectWebSocket();
+                loadHistory();
+                loadSchedules();
+            }
+        })();
+
+        // ── Auth ─────────────────────────────────────────────
+        async function doLogin() {
+            const user = document.getElementById('loginUser').value;
+            const pass = document.getElementById('loginPass').value;
+            const errEl = document.getElementById('loginError');
+            errEl.style.display = 'none';
+
+            try {
+                const r = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                const data = await r.json();
+                if (data.status === 'ok') {
+                    loginScreen.classList.add('hidden');
+                    mainApp.style.display = 'flex';
+                    document.getElementById('userDisplay').textContent = `Usuario: ${user}`;
+                    connectWebSocket();
+                    loadHistory();
+                    loadSchedules();
+                } else {
+                    errEl.textContent = data.message || 'Credenciales invalidas';
+                    errEl.style.display = 'block';
+                }
+            } catch(e) {
+                errEl.textContent = 'Error al conectar';
+                errEl.style.display = 'block';
+            }
+        }
+
+        async function doLogout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+            } catch(e) {}
+            if (socket) socket.disconnect();
+            loginScreen.classList.remove('hidden');
+            mainApp.style.display = 'none';
+            document.getElementById('loginUser').value = '';
+            document.getElementById('loginPass').value = '';
+        }
+
+        // ── WebSocket Connection ─────────────────────────────
+        function connectWebSocket() {
+            if (socket && socket.connected) return;
+
+            socket = io({
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionAttempts: 10,
+                reconnectionDelay: 1000,
+            });
+
+            socket.on('connect', () => {
+                addLog('SYS', 'tag-system', 'WebSocket conectado');
+                statusDot.classList.add('ws-connected');
+                statusText.textContent = 'Conectado (WebSocket)';
+            });
+
+            socket.on('disconnect', () => {
+                addLog('SYS', 'tag-system', 'WebSocket desconectado, reconectando...');
+                statusDot.classList.remove('ws-connected');
+                statusText.textContent = 'Desconectado';
+            });
+
+            socket.on('connect_error', (err) => {
+                console.error('WebSocket error:', err);
+                statusDot.classList.remove('ws-connected');
+                statusText.textContent = 'Error de conexión';
+            });
+
+            // Real-time message events
+            socket.on('guardx:message', handleMessage);
+            socket.on('guardx:phase', handlePhaseChange);
+            socket.on('guardx:tool', handleToolCall);
+            socket.on('guardx:tool_result', handleToolResult);
+            socket.on('guardx:finding', handleFinding);
+            socket.on('guardx:progress', handleProgress);
+            socket.on('guardx:confirm', handleConfirm);
+            socket.on('guardx:complete', handleComplete);
+        }
+
+        // ── Event Handlers ───────────────────────────────────
+        function handleMessage(data) {
+            const role = data.role || 'system';
+            let tagClass = 'tag-system';
+            if (role === 'user') tagClass = 'tag-user';
+            else if (role === 'agent') tagClass = 'tag-result';
+            addLog(role.toUpperCase(), tagClass, data.text || data.message || '');
+        }
+
+        function handlePhaseChange(data) {
+            currentPhase = data.phase || 'idle';
+            scanRunning = data.running || false;
+
+            // Update phase display
+            phaseDisplay.textContent = currentPhase.toUpperCase();
+            phaseDisplay.className = 'phase-badge';
+            if (currentPhase === 'attack') phaseDisplay.classList.add('phase-attack');
+            else if (currentPhase === 'defense') phaseDisplay.classList.add('phase-defense');
+            else if (currentPhase === 'report') phaseDisplay.classList.add('phase-report');
+
+            // Update buttons based on phase
+            const scanBtn = document.getElementById('scanBtn');
+            const exploitBtn = document.getElementById('exploitBtn');
+            const remediateBtn = document.getElementById('remediateBtn');
+            const reportBtn = document.getElementById('reportBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+
+            scanBtn.disabled = scanRunning;
+            exploitBtn.disabled = currentPhase !== 'waiting_exploit';
+            remediateBtn.disabled = currentPhase !== 'waiting_fix';
+            reportBtn.disabled = true;
+            cancelBtn.disabled = false;
+
+            // Clear all active highlights
+            [scanBtn, exploitBtn, remediateBtn, reportBtn].forEach(b => b.classList.remove('btn-active'));
+
+            // Highlight the next action button
+            if (currentPhase === 'waiting_exploit') {
+                exploitBtn.classList.add('btn-active');
+                addLog('SYS', 'tag-system', '>>> Click EXPLOTAR para validar vulnerabilidades <<<');
+            } else if (currentPhase === 'waiting_fix') {
+                remediateBtn.classList.add('btn-active');
+                addLog('SYS', 'tag-system', '>>> Click REPARAR para corregir via SSH <<<');
+            }
+
+            addLog('PHASE', 'tag-phase', `Fase: ${currentPhase.toUpperCase()} (${scanRunning ? 'corriendo' : 'finalizado'})`);
+        }
+
+        function handleToolCall(data) {
+            toolCount++;
+            toolCountDisplay.textContent = toolCount;
+            const toolName = data.tool_name || data.name || 'desconocida';
+            const params = data.params || data.input || '';
+            addLog('TOOL', 'tag-tool', `Ejecutando: ${toolName}` + (params ? ` [${JSON.stringify(params).substring(0, 50)}...]` : ''));
+        }
+
+        function handleToolResult(data) {
+            const toolName = data.name || 'desconocida';
+            const duration = (data.duration || 0).toFixed(1);
+            const success = data.success !== false;
+            const status = success ? 'OK' : 'FAIL';
+            const cls = success ? 'tag-tool' : 'tag-error';
+            addLog(status, cls, `${toolName} [${status} ${duration}s]`);
+        }
+
+        function handleFinding(data) {
+            const severity = data.severity || 'medium';
+            const title = data.title || data.name || 'Hallazgo sin titulo';
+            const evidence = data.evidence || data.description || '';
+
+            // Update stats
+            if (severity === 'critical') stats.critical++;
+            else if (severity === 'high') stats.high++;
+            else if (severity === 'medium') stats.medium++;
+            else if (severity === 'low') stats.low++;
+
+            updateStats();
+
+            const tagClass = `tag-finding-${severity}`;
+            addLog(`FINDING-${severity.toUpperCase()}`, tagClass, title);
+            if (evidence) {
+                addLog(`EVIDENCE-${severity.toUpperCase()}`, tagClass, evidence, true);
+            }
+        }
+
+        function handleProgress(data) {
+            const percent = data.percent || data.progress || 0;
+            const label = data.label || data.stage || 'Procesando...';
+
+            progressLabel.textContent = label;
+            progressFill.style.width = percent + '%';
+            progressPct.textContent = Math.round(percent) + '%';
+        }
+
+        function handleConfirm(data) {
+            currentConfirmId = data.id || data.scan_id;
+            const cmd = data.command || data.action || 'accion desconocida';
+            confirmCmd.textContent = cmd;
+            confirmBar.classList.remove('hidden');
+        }
+
+        function handleComplete(data) {
+            scanRunning = false;
+            currentPhase = 'idle';
+            currentScanId = data.scan_id || data.id;
+
+            clearInterval(timerInterval);
+            document.getElementById('scanBtn').disabled = false;
+
+            addLog('SYS', 'tag-system', '✓ Escaneo completado');
+
+            if (data.report_id) {
+                const reportBtn = document.createElement('button');
+                reportBtn.className = 'btn btn-green';
+                reportBtn.textContent = 'Ver Reporte';
+                reportBtn.onclick = () => window.open('/api/report/html');
+                console_.appendChild(reportBtn);
+            }
+
+            loadHistory();
+        }
+
+        // ── Chat & Commands ──────────────────────────────────
+        function sendChat() {
+            const msg = chatInput.value.trim();
+            if (!msg) return;
+
+            chatInput.value = '';
+
+            if (socket && socket.connected) {
+                // El servidor reenvia el mensaje via guardx:message, no agregar localmente
+                socket.emit('guardx:chat', { message: msg });
+            } else {
+                // Fallback HTTP: agregar localmente porque no hay echo del server
+                addLog('USER', 'tag-user', msg);
+                fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: msg })
+                }).catch(e => addLog('SYS', 'tag-system', `Error: ${e.message}`));
+            }
+        }
+
+        function confirmAction(approved) {
+            confirmBar.classList.add('hidden');
+
+            if (socket && socket.connected) {
+                socket.emit('guardx:confirm_response', { approved, id: currentConfirmId });
+            } else {
+                // Fallback to HTTP
+                fetch('/api/confirm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ approved, id: currentConfirmId })
+                }).catch(e => addLog('SYS', 'tag-system', `Error: ${e.message}`));
+            }
+        }
+
+        // ── Scan Actions ─────────────────────────────────────
+        async function startScan() {
+            const target = prompt('Ingresa el target (URL o IP):');
+            if (!target) return;
+
+            scanRunning = true;
+            toolCount = 0;
+            stats = { critical: 0, high: 0, medium: 0, low: 0 };
+            scanStart = Date.now();
+
+            console_.innerHTML = '';
+            updateStats();
+            addLog('SYS', 'tag-system', `Iniciando escaneo en ${target}...`);
+
+            progressContainer.classList.remove('hidden');
+            startTimer();
+
+            try {
+                const r = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target })
+                });
+                const data = await r.json();
+                if (data.error) {
+                    addLog('SYS', 'tag-system', `Error: ${data.error}`);
+                    scanRunning = false;
+                } else if (data.scan_id) {
+                    currentScanId = data.scan_id;
+                    addLog('SYS', 'tag-system', `Escaneo #${data.scan_id} iniciado`);
+                }
+            } catch(e) {
+                addLog('SYS', 'tag-system', `Error al iniciar escaneo: ${e.message}`);
+                scanRunning = false;
+            }
+        }
+
+        async function startExploit() {
+            addLog('SYS', 'tag-system', 'Iniciando fase de explotacion...');
+            document.getElementById('exploitBtn').classList.remove('btn-active');
+            document.getElementById('exploitBtn').disabled = true;
+            try {
+                const r = await fetch('/api/exploit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                const data = await r.json();
+                if (data.error) {
+                    addLog('SYS', 'tag-system', `Error exploit: ${data.error}`);
+                    document.getElementById('exploitBtn').disabled = false;
+                    document.getElementById('exploitBtn').classList.add('btn-active');
+                }
+            } catch(e) {
+                addLog('SYS', 'tag-system', `Error al iniciar exploit: ${e.message}`);
+                document.getElementById('exploitBtn').disabled = false;
+            }
+        }
+
+        async function startReport() {
+            addLog('SYS', 'tag-system', 'El reporte se genera automaticamente despues de la fase de defensa');
+        }
+
+        function startRemediate() {
+            sshModal.classList.remove('hidden');
+        }
+
+        function confirmSSHAndRemediate() {
+            const host = document.getElementById('sshHost').value || 'default';
+            const user = document.getElementById('sshUser').value;
+            const pass = document.getElementById('sshPass').value;
+            const key = document.getElementById('sshKey').value;
+
+            if (!user || (!pass && !key)) {
+                alert('Se requiere usuario y password o key SSH');
+                return;
+            }
+
+            hideSSHModal();
+            addLog('SYS', 'tag-system', `Conectando SSH a ${host} como ${user}...`);
+
+            fetch('/api/remediate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ host, user, password: pass, key_path: key })
+            }).then(r => r.json()).then(data => {
+                if (data.error) {
+                    addLog('SYS', 'tag-system', `Error SSH: ${data.error}`);
+                }
+            }).catch(e => addLog('SYS', 'tag-system', `Error: ${e.message}`));
+        }
+
+        function hideSSHModal() {
+            sshModal.classList.add('hidden');
+            document.getElementById('sshHost').value = '';
+            document.getElementById('sshUser').value = '';
+            document.getElementById('sshPass').value = '';
+            document.getElementById('sshKey').value = '';
+        }
+
+        async function cancelScan() {
+            try {
+                const r = await fetch('/api/cancel', { method: 'POST' });
+                const data = await r.json();
+                if (data.status === 'cancelled') {
+                    addLog('SYS', 'tag-system', 'Escaneo cancelado');
+                    scanRunning = false;
+                    clearInterval(timerInterval);
+                } else if (data.error) {
+                    addLog('SYS', 'tag-system', `Error: ${data.error}`);
+                }
+            } catch(e) {
+                addLog('SYS', 'tag-system', `Error al cancelar: ${e.message}`);
+            }
+        }
+
+        // ── History & Schedules ──────────────────────────────
+        async function loadHistory() {
+            try {
+                const r = await fetch('/api/history');
+                const data = await r.json();
+                const list = document.getElementById('historyList');
+                list.innerHTML = '';
+
+                if (!data.scans || data.scans.length === 0) {
+                    list.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:32px">Sin historial aun</div>';
+                    return;
+                }
+
+                data.scans.forEach(scan => {
+                    const item = document.createElement('div');
+                    item.className = 'history-item';
+                    item.innerHTML = `
+                        <div class="history-item-title">${scan.target}</div>
+                        <div class="history-item-meta">
+                            <span>${scan.findings || 0} hallazgos</span>
+                            <span>${scan.phase}</span>
+                        </div>
+                    `;
+                    item.onclick = () => window.open(`/api/report/html`);
+                    list.appendChild(item);
+                });
+            } catch(e) {
+                console.error('Error loading history:', e);
+            }
+        }
+
+        async function loadSchedules() {
+            try {
+                const r = await fetch('/api/schedules');
+                if (!r.ok) return;
+
+                const data = await r.json();
+                const list = document.getElementById('scheduleList');
+                list.innerHTML = '';
+
+                if (!data.schedules || data.schedules.length === 0) {
+                    list.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:32px">Sin programaciones</div>';
+                    return;
+                }
+
+                data.schedules.forEach(sched => {
+                    const item = document.createElement('div');
+                    item.className = 'schedule-item';
+                    item.innerHTML = `
+                        <div class="schedule-item-title">${sched.name}</div>
+                        <div class="schedule-item-meta">${sched.cron || sched.next_run}</div>
+                        <div class="schedule-item-btns">
+                            <button class="btn btn-green" onclick="runSchedule('${sched.id}')" style="flex:1;padding:6px 10px;font-size:0.8em">Ejecutar</button>
+                            <button class="btn" onclick="deleteSchedule('${sched.id}')" style="flex:1;padding:6px 10px;font-size:0.8em;background:var(--bg-input);color:var(--text-secondary)">Eliminar</button>
+                        </div>
+                    `;
+                    list.appendChild(item);
+                });
+            } catch(e) {
+                console.error('Error loading schedules:', e);
+            }
+        }
+
+        async function runSchedule(id) {
+            try {
+                const r = await fetch(`/api/schedules/${id}/run`, { method: 'POST' });
+                const data = await r.json();
+                addLog('SYS', 'tag-system', `Programacion ejecutada: ${data.message || 'ok'}`);
+            } catch(e) {
+                addLog('SYS', 'tag-system', `Error: ${e.message}`);
+            }
+        }
+
+        async function deleteSchedule(id) {
+            if (!confirm('Eliminar esta programacion?')) return;
+            try {
+                await fetch(`/api/schedules/${id}`, { method: 'DELETE' });
+                loadSchedules();
+            } catch(e) {
+                addLog('SYS', 'tag-system', `Error: ${e.message}`);
+            }
+        }
+
+        // ── UI Helpers ───────────────────────────────────────
+        function switchTab(name) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(name + 'Tab').classList.add('active');
+        }
+
+        function addLog(role, tagClass, text, isEvidence = false) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+
+            if (role.includes('FINDING')) entry.classList.add('finding');
+            else if (role === 'TOOL') entry.classList.add('tool');
+            else if (role === 'RESULT') entry.classList.add('result');
+            else if (role === 'PHASE') entry.classList.add('phase');
+            else if (role.includes('CONFIRM')) entry.classList.add('confirm');
+            else if (role === 'SYS') entry.classList.add('system');
+
+            const tag = document.createElement('span');
+            tag.className = `log-tag ${tagClass}`;
+            tag.textContent = role;
+
+            const textEl = document.createElement('div');
+            textEl.className = `log-text${isEvidence ? ' finding-evidence' : ''}`;
+            textEl.textContent = text;
+
+            entry.appendChild(tag);
+            entry.appendChild(textEl);
+            console_.appendChild(entry);
+            console_.scrollTop = console_.scrollHeight;
+        }
+
+        function updateStats() {
+            criticalCountDisplay.textContent = stats.critical;
+            highCountDisplay.textContent = stats.high;
+            mediumCountDisplay.textContent = stats.medium;
+            lowCountDisplay.textContent = stats.low;
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - scanStart) / 1000);
+                const mins = Math.floor(elapsed / 60);
+                const secs = elapsed % 60;
+                timerDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+    </script>
+</body>
+</html>

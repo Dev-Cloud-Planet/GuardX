@@ -1,0 +1,44 @@
+id: exposed-debug
+
+info:
+  name: Debug Mode Enabled
+  author: guardx
+  severity: high
+  description: |
+    Detects debug mode enabled in web applications including:
+    Django DEBUG=True, PHP error reporting, Node.js stack traces,
+    and other verbose error messages leaking sensitive information.
+  reference:
+    - https://owasp.org/www-community/Improper_Error_Handling
+  tags:
+    - exposure
+    - debug
+    - error-handling
+
+http:
+  - method: GET
+    path:
+      - "/"
+
+    matchers:
+      - type: word
+        words:
+          - "DEBUG = True"
+          - "Traceback (most recent call last)"
+          - "Fatal error:"
+          - "at Object.<anonymous>"
+          - "Error: ENOENT"
+          - "TypeError:"
+          - "ReferenceError:"
+          - "<h1>An Error Occurred</h1>"
+          - "error_log_file"
+        condition: or
+        part: body
+
+    extractors:
+      - type: regex
+        part: body
+        regex:
+          - "DEBUG\\s*=\\s*True"
+          - "Traceback \\(most recent"
+          - "at\\s+\\w+\\s*\\("

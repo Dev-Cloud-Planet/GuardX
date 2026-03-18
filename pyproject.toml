@@ -1,0 +1,49 @@
+[project]
+name = "guardx"
+version = "0.2.0"
+description = "AI-powered security agent: scan, exploit, fix, report. Supports Claude, OpenRouter & Ollama."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+keywords = ["security", "pentesting", "ai", "agent", "mcp", "ollama"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Topic :: Security",
+    "Topic :: System :: Networking",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "anthropic>=0.50.0",
+    "httpx>=0.28.0",
+    "paramiko>=3.0",
+    "rich>=13.0",
+    "pydantic>=2.0",
+    "jinja2>=3.0",
+    "flask>=3.0",
+    "python-dotenv>=1.0",
+    "defusedxml>=0.7",
+]
+
+[project.optional-dependencies]
+web = [
+    "flask-socketio>=5.3",
+    "python-socketio>=5.10",
+    "python-engineio>=4.8",
+    "gunicorn>=22.0,<25.0",
+    "gevent>=24.0",
+    "gevent-websocket>=0.10",
+    "bcrypt>=4.0",
+    "beautifulsoup4>=4.12",
+]
+
+[project.urls]
+Homepage = "https://github.com/Dev-Projects-planet/guardx"
+Repository = "https://github.com/Dev-Projects-planet/guardx"
+
+[project.scripts]
+guardx = "guardx.cli:main"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"

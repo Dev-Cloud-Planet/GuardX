@@ -1,0 +1,51 @@
+id: open-redirect
+
+info:
+  name: Open Redirect Vulnerability
+  author: guardx
+  severity: medium
+  description: |
+    Detects open redirect vulnerabilities where the application
+    redirects to user-supplied URLs without proper validation,
+    allowing attackers to redirect users to malicious sites.
+  reference:
+    - https://owasp.org/www-community/attacks/Open_Redirect
+  tags:
+    - redirect
+    - vuln
+    - url-validation
+
+http:
+  - method: GET
+    path:
+      - "/?url=http://evil.com"
+      - "/?redirect=http://evil.com"
+      - "/?target=http://evil.com"
+      - "/?next=http://evil.com"
+      - "/?returnUrl=http://evil.com"
+      - "/?goto=http://evil.com"
+      - "/?forward=http://evil.com"
+      - "/?link=http://evil.com"
+      - "/?page=http://evil.com"
+      - "/redirect?url=http://evil.com"
+
+    matchers:
+      - type: status
+        status:
+          - 301
+          - 302
+          - 303
+          - 307
+
+      - type: regex
+        part: header
+        regex:
+          - "(?i)^Location:\\s*http://evil.com"
+
+    matchers-condition: and
+
+    extractors:
+      - type: regex
+        part: header
+        regex:
+          - "(?i)^Location:\\s*([^\\r\\n]+)"
